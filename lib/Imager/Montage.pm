@@ -15,7 +15,7 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head1 SYNOPSIS
 
@@ -28,31 +28,13 @@ our $VERSION = '0.01';
     my $page = $im->gen_page(
         {   
             files       => \@imgs,
-
             geometry_w  => 200,  # geometry from source. if not set , the resize_w , resize_h will be the default
             geometry_h  => 200,  # if we aren't going to resize the source images , we should specify the geometry at least.
-
-            resize_w    => 100,  # resize your source image
-            resize_h    => 100,
-                    # if we specify the resize width and height , we can ignore geometry_w and geometry_h
-
             cols        => 5,
             rows        => 5,
-
-            margin_v    => 12,    # margin for each image
-            margin_h    => 24,
-
-            page_width  => 2000,  # the output image width & height
-            page_height => 2000,
-
-            flip        => 'h',  # do horizontal flip
-            frame       => 100,    # frame width
-            res         => 300,  # resolution ( dpi )
         }
     );
-
-
-    $page->write( file => 'page.png' , type => 'png'  );
+    $page->write( file => 'page.png' , type => 'png'  );  # generate a 1000x1000 pixels image with 5x5 tiles
 
 =head1 EXPORT
 
@@ -183,14 +165,17 @@ I<res>: resolution , default resolution is 600 (optional)
 
 =cut
 
+# XXX: calculates the max cols and max rows if we specify the page width and page height
 sub gen_page {
     my $self = shift;
     my $args = shift;
 
     $args->{geometry_w} ||= $args->{resize_w};
     $args->{geometry_h} ||= $args->{resize_h};
-    $args->{border}     ||= 0;
-    $args->{frame}      ||= 0;
+
+    $args->{$_} ||= 0
+        for(qw/border frame margin_v margin_h/);
+
     $args->{$_}         ||= '#ffffff'
         for (qw/background_color border_color frame_color/);
 
@@ -206,6 +191,10 @@ sub gen_page {
         + $args->{geometry_h} * $args->{rows}
         + ( $args->{margin_v} * 2 ) * $args->{rows};
 
+
+    $args->{$_} = $self->_load_color( $args->{$_} )
+        for (qw/background_color border_color frame_color/);
+
     # create a page
     my $page_img = Imager->new( 
         xsize => $args->{page_width},
@@ -213,9 +202,6 @@ sub gen_page {
 
     $self->_set_resolution( $page_img, $args->{res} )
         if ( exists $args->{res} );
-
-    $args->{$_} = $self->_load_color( $args->{$_} )
-        for (qw/background_color border_color frame_color/);
 
     # this could make a frame for page
     if ( exists $args->{frame} ) {
@@ -274,7 +260,6 @@ sub gen_page {
                 my $box = Imager->new(
                     xsize => $args->{geometry_w} + $args->{border} * 2,
                     ysize => $args->{geometry_h} + $args->{border} * 2 )->box( filled => 1, color => $args->{border_color} );
-
                 $page_img->paste(
                     left => $left + $args->{margin_h} ,
                     top  => $top + $args->{margin_v} , 
